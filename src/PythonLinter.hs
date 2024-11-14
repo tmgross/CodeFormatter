@@ -1,4 +1,4 @@
-module PythonLinter ( lint ) where
+module PythonLinter where
 
 -- | Represents a single linting warning.
 data LintWarning = LintWarning
@@ -24,7 +24,7 @@ data LintResult = LintResult
   , summary      :: String
   } deriving (Show, Eq)
 
--- Helper function to count errors and warnings based on WarningType
+-- | Helper function to count errors and warnings based on WarningType
 countSeverity :: [LintWarning] -> (Int, Int)
 countSeverity = foldr (\w (eCount, wCount) ->
             case warningType w of

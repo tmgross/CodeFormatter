@@ -40,6 +40,7 @@ library
     , containers
     , directory
     , filepath
+    , mtl
   default-language: Haskell2010
 
 executable CodeFormatter-exe
@@ -58,6 +59,7 @@ executable CodeFormatter-exe
     , containers
     , directory
     , filepath
+    , mtl
   default-language: Haskell2010
 
 test-suite CodeFormatter-test
@@ -77,4 +79,5 @@ test-suite CodeFormatter-test
     , containers
     , directory
     , filepath
+    , mtl
   default-language: Haskell2010

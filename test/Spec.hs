@@ -35,6 +35,6 @@ compareFiles expectedFile formattedFile = do
     formattedContents <- readFile formattedFile
     return (expectedContents == formattedContents)
 
--- Main function to run the property test
+-- | Main function to run the property test
 main :: IO ()
 main = quickCheck prop_formatPythonFile

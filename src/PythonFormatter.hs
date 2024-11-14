@@ -1,5 +1,6 @@
-module PythonFormatter (format, Config(..)) where
+module PythonFormatter where
 
+import Control.Monad.State (State, get, put, runState)
 import Data.Char (isSpace)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
@@ -13,6 +14,23 @@ data Config = Config
   , trimTrailingWS   :: Bool
   , addNewlineEOF    :: Bool
   } deriving (Show, Eq)
+
+-- | The state that tracks the formatting status
+data FormatState = FormatState
+  { config         :: Config
+  , indentLevel    :: Int
+  , blockStack     :: [String]
+  , formattedLines :: [String]
+  }
+
+-- | Default FormatState, using default config values
+defaultFormatState :: Config -> FormatState
+defaultFormatState config = FormatState
+  { config = config
+  , indentLevel = 0
+  , blockStack = []
+  , formattedLines = []                  
+  }
 
 -- | Read configuration from a file, defaulting if not found or parse error
 loadConfig :: IO Config
@@ -50,12 +68,30 @@ readBool _       = Nothing
 format :: String -> IO String
 format code = do
     config <- loadConfig
-    let formattedLines = formatLines (lines code) config 0 []
-    return $ unlines formattedLines
+    let initialState = defaultFormatState config
+    let (formattedCode, finalState) = runState (formatLines (lines code)) initialState
+    return $ unlines formattedCode
 
--- | Main function to format each line according to indentation and settings
-formatLines :: [String] -> Config -> Int -> [String] -> [String]
+-- | Format each line with updated state, handling indentation and block structure
+formatLines :: [String] -> State FormatState [String]
 formatLines = undefined
+
+-- | Helper to determine if a line starts a new block (e.g., ends with a colon)
+isBlockStart :: String -> Bool
+isBlockStart line = not (null line) && last line == ':'
+
+-- | Helper to determine if the line should end a block (used for dedenting)
+isBlockEnd :: String -> [String] -> Bool
+isBlockEnd line blockStack = 
+    case blockStack of
+        (top:_) -> any (`elem` endKeywords) (words line) && top `notElem` endKeywords
+        [] -> False
+  where
+    endKeywords = ["return", "break", "continue", "pass", "else:", "elif:"]
+
+-- | Helper to add indentation spaces
+indentLine :: String -> Int -> String
+indentLine line n = replicate n ' ' ++ line
 
 -- | Trim whitespace from both ends of a string
 trim :: String -> String
