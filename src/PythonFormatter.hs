@@ -73,7 +73,7 @@ format code = do
     let processedCode = if addNewlineEOF config
                         then unlines formattedCode ++ "\n"
                         else unlines formattedCode
-    return $ unlines processedCode
+    return processedCode
 
 -- | Format each line with updated state, handling indentation and block structure
 formatLines :: [String] -> State FormatState [String]
