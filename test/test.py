@@ -8,9 +8,9 @@ def example_function(x,y):
 
 
 class ExampleClass:
- def __init__(self, name):
-   self.name=name
-   print("ExampleClass created")
+  def __init__(self, name):
+    self.name=name
+    print("ExampleClass created")
 
-    def greet(self):
-      print("Hello, " + self.name)
+  def greet(self):
+    print("Hello, " + self.name) 
