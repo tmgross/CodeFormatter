@@ -1,4 +1,5 @@
 module PythonLinter where
+import Control.Monad.State (State, get, put, execState, modify)
 
 -- | Represents a single linting warning.
 data LintWarning = LintWarning
@@ -16,13 +17,22 @@ data WarningType
   | MutableDefaultArgument
   deriving (Show, Eq)
 
--- | Represents the result of a linting process, containing all warnings and summary data.
-data LintResult = LintResult
+-- | Represents the linting state during processing.
+data LintState = LintState
   { warnings     :: [LintWarning]
   , errorCount   :: Int
   , warningCount :: Int
   , summary      :: String
-  } deriving (Show, Eq)
+  }
+
+-- | Initial state for the linting process.
+initialLintState :: LintState
+initialLintState = LintState
+  { warnings = []
+  , errorCount = 0
+  , warningCount = 0
+  , summary = "Starting linting..."
+  }
 
 -- | Helper function to count errors and warnings based on WarningType
 countSeverity :: [LintWarning] -> (Int, Int)
@@ -34,17 +44,38 @@ countSeverity = foldr (\w (eCount, wCount) ->
 
 -- | Lints Python code by calling various checks and returning a `LintResult`.
 lint :: String -> LintResult
-lint code =
-    let warnings = concat [ checkUnusedImports code
-                          , checkSyntaxErrors code
-                          , validateNamingConventions code
-                          , checkUnusedVariables code
-                          , checkDeprecatedFunctions code
-                          , checkMutableDefaults code
-                          ]
-        (errorCount, warningCount) = countSeverity warnings
-        summary = "Linting completed with " ++ show errorCount ++ " errors and " ++ show warningCount ++ " warnings."
-    in LintResult warnings errorCount warningCount summary
+lint code = 
+    let finalState = execState (runLintChecks code) initialLintState
+    in LintResult (warnings finalState) (errorCount finalState) (warningCount finalState) (summary finalState)
+
+-- | Run all lint checks, updating the state for each warning found.
+runLintChecks :: String -> State LintState ()
+runLintChecks code = do
+    addWarnings $ checkUnusedImports code
+    addWarnings $ checkSyntaxErrors code
+    addWarnings $ validateNamingConventions code
+    addWarnings $ checkUnusedVariables code
+    addWarnings $ checkDeprecatedFunctions code
+    addWarnings $ checkMutableDefaults code
+    updateSummary
+
+-- | Adds warnings to the state, updating error and warning counts.
+addWarnings :: [LintWarning] -> State LintState ()
+addWarnings ws = do
+    st <- get
+    let (errors, warnings) = countSeverity ws
+    put st { warnings = warnings st ++ ws
+           , errorCount = errorCount st + errors
+           , warningCount = warningCount st + warnings
+           }
+
+-- | Update the summary based on the current state.
+updateSummary :: State LintState ()
+updateSummary = do
+    st <- get
+    let newSummary = "Linting completed with " ++ show (errorCount st) 
+                     ++ " errors and " ++ show (warningCount st) ++ " warnings."
+    put st { summary = newSummary }
 
 -- | Checks for unused imports in Python code.
 checkUnusedImports :: String -> [LintWarning]
