@@ -1,4 +1,5 @@
 module PythonLinter where
+
 import Control.Monad.State (State, get, put, execState, modify)
 
 -- | Represents a single linting warning.
@@ -17,13 +18,13 @@ data WarningType
   | MutableDefaultArgument
   deriving (Show, Eq)
 
--- | Represents the linting state during processing.
+-- | Represents the state used during the linting process.
 data LintState = LintState
   { warnings     :: [LintWarning]
   , errorCount   :: Int
   , warningCount :: Int
   , summary      :: String
-  }
+  } deriving (Show, Eq)
 
 -- | Initial state for the linting process.
 initialLintState :: LintState
@@ -34,19 +35,9 @@ initialLintState = LintState
   , summary = "Starting linting..."
   }
 
--- | Helper function to count errors and warnings based on WarningType
-countSeverity :: [LintWarning] -> (Int, Int)
-countSeverity = foldr (\w (eCount, wCount) ->
-            case warningType w of
-              SyntaxError -> (eCount + 1, wCount)
-              _           -> (eCount, wCount + 1)
-          ) (0, 0)
-
--- | Lints Python code by calling various checks and returning a `LintResult`.
-lint :: String -> LintResult
-lint code = 
-    let finalState = execState (runLintChecks code) initialLintState
-    in LintResult (warnings finalState) (errorCount finalState) (warningCount finalState) (summary finalState)
+-- | Lints Python code by calling various checks and returning the final `LintState`.
+lint :: String -> LintState
+lint code = execState (runLintChecks code) initialLintState
 
 -- | Run all lint checks, updating the state for each warning found.
 runLintChecks :: String -> State LintState ()
@@ -63,10 +54,10 @@ runLintChecks code = do
 addWarnings :: [LintWarning] -> State LintState ()
 addWarnings ws = do
     st <- get
-    let (errors, warnings) = countSeverity ws
+    let (e, w) = countSeverity ws
     put st { warnings = warnings st ++ ws
-           , errorCount = errorCount st + errors
-           , warningCount = warningCount st + warnings
+           , errorCount = errorCount st + e
+           , warningCount = warningCount st + w
            }
 
 -- | Update the summary based on the current state.
@@ -76,6 +67,14 @@ updateSummary = do
     let newSummary = "Linting completed with " ++ show (errorCount st) 
                      ++ " errors and " ++ show (warningCount st) ++ " warnings."
     put st { summary = newSummary }
+
+-- | Helper function to count errors and warnings based on WarningType
+countSeverity :: [LintWarning] -> (Int, Int)
+countSeverity = foldr (\w (eCount, wCount) ->
+            case warningType w of
+              SyntaxError -> (eCount + 1, wCount)
+              _           -> (eCount, wCount + 1)
+          ) (0, 0)
 
 -- | Checks for unused imports in Python code.
 checkUnusedImports :: String -> [LintWarning]
