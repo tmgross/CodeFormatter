@@ -70,11 +70,38 @@ format code = do
     config <- loadConfig
     let initialState = defaultFormatState config
     let (formattedCode, finalState) = runState (formatLines (lines code)) initialState
-    return $ unlines formattedCode
+    let processedCode = if addNewlineEOF config
+                        then unlines formattedCode ++ "\n"
+                        else unlines formattedCode
+    return $ unlines processedCode
 
 -- | Format each line with updated state, handling indentation and block structure
 formatLines :: [String] -> State FormatState [String]
 formatLines = undefined
+
+-- | Format a Python dictionary literal.
+formatDict :: String -> Int -> State FormatState String
+formatDict = undefined
+
+-- | Format a Python list literal.
+formatList :: String -> Int -> State FormatState String
+formatList listString indentLevel = undefined
+
+-- | Format a Python function definition, including indentation and spacing.
+formatFunction :: String -> Int -> State FormatState String
+formatFunction funcString indentLevel = undefined
+
+-- | Format Python if-else structures.
+formatIfElse :: String -> Int -> State FormatState String
+formatIfElse ifElseString indentLevel = undefined
+
+-- | Format Python class definitions.
+formatClass :: String -> Int -> State FormatState String
+formatClass classString indentLevel = undefined
+
+-- | Split long lines into smaller chunks while respecting Python syntax.
+splitLongLines :: String -> Int -> State FormatState [String]
+splitLongLines longLine indentLevel = undefined
 
 -- | Helper to determine if a line starts a new block (e.g., ends with a colon)
 isBlockStart :: String -> Bool
@@ -93,7 +120,14 @@ isBlockEnd line blockStack =
 indentLine :: String -> Int -> String
 indentLine line n = replicate n ' ' ++ line
 
+-- | Trim whitespace from the beginning of a string
+trimStart :: String -> String
+trimStart = dropWhile isSpace
+
+-- | Trim whitespace from the end of a string
+trimEnd :: String -> String
+trimEnd = reverse . dropWhile isSpace . reverse
+
 -- | Trim whitespace from both ends of a string
 trim :: String -> String
-trim = f . f
-   where f = reverse . dropWhile isSpace
+trim = trimStart . trimEnd
