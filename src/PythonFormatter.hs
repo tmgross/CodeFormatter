@@ -2,10 +2,13 @@ module PythonFormatter where
 
 import Control.Monad.State (State, get, put, runState)
 import Data.Char (isSpace)
+import Data.List (isInfixOf, isPrefixOf)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
 import System.IO
 import System.Directory (doesFileExist)
+
+import Debug.Trace (trace)
 
 -- | Configuration for formatting options
 data Config = Config
@@ -29,7 +32,7 @@ defaultFormatState config = FormatState
   { config = config
   , indentLevel = 0
   , blockStack = []
-  , formattedLines = []                  
+  , formattedLines = []
   }
 
 -- | Read configuration from a file, defaulting if not found or parse error
@@ -77,7 +80,49 @@ format code = do
 
 -- | Format each line with updated state, handling indentation and block structure
 formatLines :: [String] -> State FormatState [String]
-formatLines = undefined
+formatLines [] = return []
+formatLines (line:rest) = do
+    state <- get
+    let _line = process (indentLine line (indentLevel state))
+    let _state = updateState _line state
+    put _state
+    _rest <- formatLines rest
+    trace (show (indentLevel _state) ++ ": " ++ _line)  return (_line:_rest)
+
+updateState :: String -> FormatState -> FormatState
+updateState line state =
+    let
+        currentIndent = indentLevel state
+        currentBlockStack = blockStack state
+
+        isBlockStart = not (null line) && last line == ':'
+        newBlockStack
+            | isBlockStart = line : currentBlockStack
+            | isElse line currentBlockStack = currentBlockStack  
+            | otherwise = currentBlockStack
+
+        isClass = "class" `isInfixOf` line
+        isDef = "def" `isInfixOf` line
+
+        indent
+            | isClass = 1
+            | isBlockStart = currentIndent + 1 
+            | isBlockEnd line currentBlockStack = max 0 (currentIndent - 1) 
+            | otherwise = currentIndent
+
+    in
+    state { indentLevel = indent, blockStack = newBlockStack }
+
+process :: String -> String
+process [] = []
+process [c] = [c]
+process (c1:c2:rest)
+    -- operators
+    | c1 `elem` "+-*/<>=!" && not (isSpace c2) = c1 : ' ' : process (c2:rest)
+    | c2 `elem` "+-*/<>=!" && not (isSpace c1) = c1 : ' ' : process (c2:rest)
+    -- comma spacing
+    | c1 == ',' && not (isSpace c2) = c1 : ' ' : process (c2:rest)
+    | otherwise = c1 : process (c2:rest)
 
 -- | Format a Python dictionary literal.
 formatDict :: String -> Int -> State FormatState String
@@ -107,9 +152,14 @@ splitLongLines longLine indentLevel = undefined
 isBlockStart :: String -> Bool
 isBlockStart line = not (null line) && last line == ':'
 
+-- | Helper to align if statements with else statements
+isElse :: String -> [String] -> Bool
+isElse line blockStack = 
+    "else:" `isInfixOf` line && not (null blockStack) && ("if" `isInfixOf` head blockStack)
+
 -- | Helper to determine if the line should end a block (used for dedenting)
 isBlockEnd :: String -> [String] -> Bool
-isBlockEnd line blockStack = 
+isBlockEnd line blockStack =
     case blockStack of
         (top:_) -> any (`elem` endKeywords) (words line) && top `notElem` endKeywords
         [] -> False
@@ -118,7 +168,9 @@ isBlockEnd line blockStack =
 
 -- | Helper to add indentation spaces
 indentLine :: String -> Int -> String
-indentLine line n = replicate n ' ' ++ line
+indentLine line n
+    | "class " `isPrefixOf` line = trim line  -- Check if the line starts with "class"
+    | otherwise = replicate (n * 4) ' ' ++ trim line  -- Add indentation otherwise
 
 -- | Trim whitespace from the beginning of a string
 trimStart :: String -> String
