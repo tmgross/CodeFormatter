@@ -24,6 +24,7 @@ data FormatState = FormatState
   , indentLevel    :: Int
   , blockStack     :: [String]
   , formattedLines :: [String]
+  , lastLine       :: String
   }
 
 -- | Default FormatState, using default config values
@@ -33,6 +34,7 @@ defaultFormatState config = FormatState
   , indentLevel = 0
   , blockStack = []
   , formattedLines = []
+  , lastLine = []
   }
 
 -- | Read configuration from a file, defaulting if not found or parse error
@@ -83,22 +85,23 @@ formatLines :: [String] -> State FormatState [String]
 formatLines [] = return []
 formatLines (line:rest) = do
     state <- get
-    let _line = process (indentLine line (indentLevel state))
+    let _line = process (indentLine line (lastLine state) (indentLevel state) (calculateIndentLevel line 4))
     let _state = updateState _line state
     put _state
     _rest <- formatLines rest
-    trace (show (indentLevel _state) ++ ": " ++ _line)  return (_line:_rest)
+    trace (show (indentLevel _state) ++ "-" ++ "-" ++ show (calculateIndentLevel _line 4) ++ ": " ++ _line)  return (_line:_rest)
 
 updateState :: String -> FormatState -> FormatState
 updateState line state =
     let
-        currentIndent = indentLevel state
+        _lastLine = line
+        currentIndent = calculateIndentLevel line 4
         currentBlockStack = blockStack state
 
-        isBlockStart = not (null line) && last line == ':'
+        _isBlockStart = not (null line) && last line == ':'
         newBlockStack
-            | isBlockStart = line : currentBlockStack
-            | isElse line currentBlockStack = currentBlockStack  
+            | _isBlockStart = line : currentBlockStack
+            | isElse line currentBlockStack = currentBlockStack
             | otherwise = currentBlockStack
 
         isClass = "class" `isInfixOf` line
@@ -106,12 +109,11 @@ updateState line state =
 
         indent
             | isClass = 1
-            | isBlockStart = currentIndent + 1 
-            | isBlockEnd line currentBlockStack = max 0 (currentIndent - 1) 
+            | _isBlockStart = currentIndent + 1
             | otherwise = currentIndent
 
     in
-    state { indentLevel = indent, blockStack = newBlockStack }
+    state { indentLevel = indent, blockStack = newBlockStack, lastLine = _lastLine }
 
 process :: String -> String
 process [] = []
@@ -123,6 +125,10 @@ process (c1:c2:rest)
     -- comma spacing
     | c1 == ',' && not (isSpace c2) = c1 : ' ' : process (c2:rest)
     | otherwise = c1 : process (c2:rest)
+
+-- Get user-defined indent
+calculateIndentLevel :: String -> Int -> Int
+calculateIndentLevel line width = length (takeWhile isSpace line) `div` width
 
 -- | Format a Python dictionary literal.
 formatDict :: String -> Int -> State FormatState String
@@ -155,7 +161,7 @@ isBlockStart line = not (null line) && last line == ':'
 -- | Helper to align if statements with else statements
 isElse :: String -> [String] -> Bool
 isElse line blockStack = 
-    "else:" `isInfixOf` line && not (null blockStack) && ("if" `isInfixOf` head blockStack)
+    "else:" `isInfixOf` line
 
 -- | Helper to determine if the line should end a block (used for dedenting)
 isBlockEnd :: String -> [String] -> Bool
@@ -167,9 +173,13 @@ isBlockEnd line blockStack =
     endKeywords = ["return", "break", "continue", "pass", "else:", "elif:"]
 
 -- | Helper to add indentation spaces
-indentLine :: String -> Int -> String
-indentLine line n
-    | "class " `isPrefixOf` line = trim line  -- Check if the line starts with "class"
+-- Note that the state updates after this, so here is where we need to actually backpedal, 
+-- the state will not see elses or user-unindents until after they happen
+indentLine :: String -> String -> Int -> Int -> String
+indentLine line prev n userIndent
+    | "class" `isPrefixOf` line = trim line  -- Check if the line starts with "class"
+    | ":" `isInfixOf` prev = replicate (n * 4) ' ' ++ trim line -- In cases where the previous line started a block, trust the state
+    | userIndent < n = replicate ((userIndent + 1) * 4) ' ' ++ trim line  -- Otherwise, we should trust the user indentation, in case they de-indent out of a block
     | otherwise = replicate (n * 4) ' ' ++ trim line  -- Add indentation otherwise
 
 -- | Trim whitespace from the beginning of a string
