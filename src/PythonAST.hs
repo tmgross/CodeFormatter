@@ -162,15 +162,3 @@ data AugOp
     | AugMod | AugPow | AugLShift | AugRShift | AugBitOr
     | AugBitXor | AugBitAnd | AugMatMult
     deriving (Show, Eq)
--------------
--- Helpers --
--------------
-
-trim :: String -> String
-trim = trimStart . trimEnd
-
-trimStart :: String -> String
-trimStart = dropWhile (\c -> c == ' ' || c == '\t' || c == '\n' || c == '\r')
-
-trimEnd :: String -> String
-trimEnd = reverse . trimStart . reverse
