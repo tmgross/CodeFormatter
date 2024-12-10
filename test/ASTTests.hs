@@ -48,21 +48,21 @@ testExpressions = TestList
 testImports :: Test
 testImports = TestList
     [ TestLabel "Parser | Import | Single Module" $
-        assertParse importStmt "import os\n" (ImportStmt [ImportItem "os" Nothing])
+        assertParse stmt "import os\n" (ImportStmt [ImportItem "os" Nothing])
     , TestLabel "Parser | Import | Multiple Modules" $
-        assertParse importStmt "import os, sys\n" 
+        assertParse stmt "import os, sys\n" 
             (ImportStmt [ImportItem "os" Nothing, ImportItem "sys" Nothing])
     , TestLabel "Parser | Import | With Alias" $
-        assertParse importStmt "import numpy as np\n" 
+        assertParse stmt "import numpy as np\n" 
             (ImportStmt [ImportItem "numpy" (Just "np")])
     , TestLabel "Parser | From Import | Single Item" $
-        assertParse fromImportStmt "from math import sqrt\n" 
+        assertParse stmt "from math import sqrt\n" 
             (FromImportStmt "math" [ImportItem "sqrt" Nothing])
     , TestLabel "Parser | From Import | Multiple Items" $
-        assertParse fromImportStmt "from math import sqrt, pi\n" 
+        assertParse stmt "from math import sqrt, pi\n" 
             (FromImportStmt "math" [ImportItem "sqrt" Nothing, ImportItem "pi" Nothing])
     , TestLabel "Parser | From Import | With Alias" $
-        assertParse fromImportStmt "from math import sqrt as root\n" 
+        assertParse stmt "from math import sqrt as root\n" 
             (FromImportStmt "math" [ImportItem "sqrt" (Just "root")])
     ]
 

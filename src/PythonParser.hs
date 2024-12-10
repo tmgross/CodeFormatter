@@ -33,7 +33,8 @@ stmt = try compoundStmt <|> simpleStmt <* lineEnd
 
 simpleStmt :: Parser AST
 simpleStmt = choice
-    [ try returnStmt
+    [ try blankLine
+    , try returnStmt
     , try raiseStmt
     , try passStmt
     , try breakStmt
@@ -51,26 +52,34 @@ simpleStmt = choice
 
 compoundStmt :: Parser AST
 compoundStmt = choice
-    [ ifStmt
-    , forStmt
-    , asyncForStmt
-    , whileStmt
-    , tryStmt
-    , withStmt
-    , asyncWithStmt
-    , classDefStmt
-    , functionDefStmt
-    , asyncFunctionDefStmt
-    , importStmt
-    , fromImportStmt
+    [ try ifStmt
+    , try classDefStmt
+    , try forStmt
+    , try asyncForStmt
+    , try whileStmt
+    , try tryStmt
+    , try withStmt
+    , try asyncWithStmt
+    , try functionDefStmt
+    , try asyncFunctionDefStmt
+    , try importStmt
+    , try fromImportStmt
     ]
+
+-- | Matches a blank line (only whitespace and a newline)
+blankLine :: Parser AST
+blankLine = do
+    whitespace
+    lineEnd
+    return PassStmt
 
 importStmt :: Parser AST
 importStmt = do
-  string "import"
-  whitespace
-  modules <- sepBy importItem (char ',' >> whitespace)
-  return $ ImportStmt modules
+    string "import"
+    whitespace
+    modules <- sepBy1 importItem (char ',' >> whitespace)
+    lineEnd
+    return $ ImportStmt modules
 
 fromImportStmt :: Parser AST
 fromImportStmt = do
@@ -735,9 +744,9 @@ currentIndentation = do
 
 identifier :: Parser String
 identifier = do
-  first <- letter
-  rest <- many (alphaNum <|> char '_')
-  return (first:rest)
+    first <- letter
+    rest <- many (alphaNum <|> char '_' <|> char '.')
+    return (first:rest)
 
 parens :: Parser a -> Parser a
 parens p = do
