@@ -1,0 +1,739 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use <$>" #-}
+module PythonParser where
+
+import Text.Parsec
+import Text.Parsec.String (Parser)
+import PythonAST
+
+------------------------------
+-- Top-Level Parser
+------------------------------
+
+program :: Parser AST
+program = do
+    -- Consume initial whitespace/comments as needed
+    -- Parse multiple top-level statements
+    stmts <- many topLevelStatement
+    eof
+    return (Module stmts)
+
+topLevelStatement :: Parser AST
+topLevelStatement = stmt
+
+------------------------------
+-- Statements
+------------------------------
+
+stmt :: Parser AST
+stmt = try compoundStmt <|> simpleStmt
+
+simpleStmt :: Parser AST
+simpleStmt = choice
+    [ try returnStmt
+    , try raiseStmt
+    , try passStmt
+    , try breakStmt
+    , try continueStmt
+    , try globalStmt
+    , try nonlocalStmt
+    , try deleteStmt
+    , try docStringStmt
+    , try assignStmt
+    , try augAssignStmt
+    , try annAssignStmt
+    , try exprStmt
+    , try commentStmt
+    ]
+
+compoundStmt :: Parser AST
+compoundStmt = choice
+    [ try ifStmt
+    , try forStmt
+    , try asyncForStmt
+    , try whileStmt
+    , try tryStmt
+    , try withStmt
+    , try asyncWithStmt
+    , try classDefStmt
+    , try functionDefStmt
+    , try asyncFunctionDefStmt
+    , try importStmt
+    , try fromImportStmt
+    ]
+
+importStmt :: Parser AST
+importStmt = do
+  string "import"
+  spaces
+  modules <- sepBy importItem (char ',' >> spaces)
+  return $ ImportStmt modules
+
+fromImportStmt :: Parser AST
+fromImportStmt = do
+  string "from"
+  spaces
+  moduleName <- identifier
+  spaces
+  string "import"
+  spaces
+  items <- sepBy importItem (char ',' >> spaces)
+  return $ FromImportStmt moduleName items
+
+classDefStmt :: Parser AST
+classDefStmt = do
+    string "class"
+    spaces
+    name <- identifier
+    bases <- option [] (try parseBases)
+    spaces
+    char ':'
+    newline
+    body <- indentedBlock stmt
+    return $ ClassDef name bases [] body
+
+-- Parses base classes in parentheses, e.g., `(Base1, Base2)`
+parseBases :: Parser [Expr]
+parseBases = do
+    char '('
+    bases <- sepBy expr (char ',' >> spaces)
+    char ')'
+    return bases
+
+functionDefStmt :: Parser AST
+functionDefStmt = do
+    string "def"
+    spaces
+    name <- identifier
+    spaces
+    char '('
+    params <- params
+    char ')'
+    returnType <- optionMaybe parseReturnType
+    spaces
+    char ':'
+    newline
+    body <- indentedBlock stmt
+    return $ FunctionDef name params returnType body
+
+-- Parses the return type hint after `->`
+parseReturnType :: Parser Expr
+parseReturnType = do
+    spaces
+    string "->"
+    spaces
+    expr
+
+asyncFunctionDefStmt :: Parser AST
+asyncFunctionDefStmt = do
+    string "async"
+    spaces
+    string "def"
+    spaces
+    name <- identifier
+    spaces
+    char '('
+    params <- params
+    char ')'
+    returnType <- optionMaybe parseReturnType
+    spaces
+    char ':'
+    newline
+    body <- indentedBlock stmt
+    return $ AsyncFunctionDef name params returnType body
+
+ifStmt :: Parser AST
+ifStmt = do
+    string "if"
+    spaces
+    condition <- expr
+    spaces
+    char ':'
+    newline
+    ifBody <- indentedBlock stmt
+    elifClauses <- many elifStmt
+    elseBody <- option [] elseStmt
+    return $ IfStmt condition ifBody elifClauses elseBody
+
+elifStmt :: Parser (Expr, [AST])
+elifStmt = do
+    string "elif"
+    spaces
+    condition <- expr
+    spaces
+    char ':'
+    newline
+    body <- indentedBlock stmt
+    return (condition, body)
+
+elseStmt :: Parser [AST]
+elseStmt = do
+    string "else"
+    spaces
+    char ':'
+    newline
+    indentedBlock stmt
+
+forStmt :: Parser AST
+forStmt = do
+    string "for"
+    spaces
+    target <- expr
+    spaces
+    string "in"
+    spaces
+    iterable <- expr
+    spaces
+    char ':'
+    newline
+    body <- indentedBlock stmt
+    elseBody <- option [] elseStmt
+    return $ ForStmt target iterable body elseBody
+
+asyncForStmt :: Parser AST
+asyncForStmt = do
+    string "async"
+    spaces
+    string "for"
+    spaces
+    target <- expr
+    spaces
+    string "in"
+    spaces
+    iterable <- expr
+    spaces
+    char ':'
+    newline
+    body <- indentedBlock stmt
+    elseBody <- option [] elseStmt
+    return $ AsyncForStmt target iterable body elseBody
+
+whileStmt :: Parser AST
+whileStmt = do
+    string "while"
+    spaces
+    condition <- expr
+    spaces
+    char ':'
+    newline
+    body <- indentedBlock stmt
+    elseBody <- option [] elseStmt
+    return $ WhileStmt condition body elseBody
+
+tryStmt :: Parser AST
+tryStmt = do
+    string "try"
+    spaces
+    char ':'
+    newline
+    tryBody <- indentedBlock stmt
+    exceptClauses <- many exceptStmt
+    elseBody <- option [] elseStmt
+    finallyBody <- option [] finallyStmt
+    return $ TryStmt tryBody exceptClauses elseBody finallyBody
+
+exceptStmt :: Parser ExceptClause
+exceptStmt = do
+    string "except"
+    spaces
+    exceptType <- optionMaybe (try expr)
+    exceptName <- optionMaybe (try (spaces >> string "as" >> spaces >> identifier))
+    spaces
+    char ':'
+    newline
+    exceptBody <- indentedBlock stmt
+    return $ ExceptClause exceptType exceptName exceptBody
+
+finallyStmt :: Parser [AST]
+finallyStmt = do
+    string "finally"
+    spaces
+    char ':'
+    newline
+    indentedBlock stmt
+
+withStmt :: Parser AST
+withStmt = do
+    string "with"
+    spaces
+    items <- sepBy withItem (char ',' >> spaces)
+    spaces
+    char ':'
+    newline
+    body <- indentedBlock stmt
+    return $ WithStmt items body
+
+withItem :: Parser (Expr, Maybe String)
+withItem = do
+    contextExpr <- expr
+    alias <- optionMaybe (try (spaces >> string "as" >> spaces >> identifier))
+    return (contextExpr, alias)
+
+asyncWithStmt :: Parser AST
+asyncWithStmt = do
+    string "async"
+    spaces
+    string "with"
+    spaces
+    items <- sepBy withItem (char ',' >> spaces)
+    spaces
+    char ':'
+    newline
+    body <- indentedBlock stmt
+    return $ AsyncWithStmt items body
+
+returnStmt :: Parser AST
+returnStmt = do
+    string "return"
+    spaces
+    value <- optionMaybe expr
+    newline
+    return $ ReturnStmt value
+
+raiseStmt :: Parser AST
+raiseStmt = do
+    string "raise"
+    spaces
+    exception <- optionMaybe expr
+    fromClause <- optionMaybe (try parseFromClause)
+    newline
+    return $ RaiseStmt exception fromClause
+
+parseFromClause :: Parser Expr
+parseFromClause = do
+    spaces
+    string "from"
+    spaces
+    expr
+
+passStmt :: Parser AST
+passStmt = do
+    string "pass"
+    spaces
+    newline
+    return PassStmt
+
+breakStmt :: Parser AST
+breakStmt = do
+    string "break"
+    spaces
+    newline
+    return BreakStmt
+
+continueStmt :: Parser AST
+continueStmt = do
+    string "continue"
+    spaces
+    newline
+    return ContinueStmt
+
+globalStmt :: Parser AST
+globalStmt = do
+    string "global"
+    spaces
+    variables <- sepBy1 identifier (char ',' >> spaces)
+    newline
+    return $ GlobalStmt variables
+
+nonlocalStmt :: Parser AST
+nonlocalStmt = do
+    string "nonlocal"
+    spaces
+    variables <- sepBy1 identifier (char ',' >> spaces)
+    newline
+    return $ NonlocalStmt variables
+
+exprStmt :: Parser AST
+exprStmt = do
+    expression <- expr
+    newline
+    return $ ExprStmt expression
+
+assignStmt :: Parser AST
+assignStmt = do
+    targets <- sepBy1 expr (spaces >> char '=' >> spaces)
+    let value = last targets
+    let vars = init targets
+    if length targets == 1
+        then fail "Invalid assignment: no value provided"
+        else return $ Assign vars value
+
+augAssignStmt :: Parser AST
+augAssignStmt = do
+    target <- expr
+    spaces
+    operator <- parseAugOp
+    spaces
+    value <- expr
+    newline
+    return $ AugAssign target operator value
+
+annAssignStmt :: Parser AST
+annAssignStmt = do
+    target <- expr
+    spaces
+    char ':'
+    spaces
+    annotation <- expr
+    hasValue <- option False (True <$ parseAssignValue)
+    newline
+    return $ AnnAssign target annotation hasValue
+
+-- Parses the assignment part of an annotated assignment (e.g., `= 3.14`).
+parseAssignValue :: Parser ()
+parseAssignValue = do
+    spaces
+    char '='
+    spaces
+    expr
+    return ()
+
+deleteStmt :: Parser AST
+deleteStmt = do
+    string "del"
+    spaces
+    targets <- sepBy1 expr (char ',' >> spaces)
+    newline
+    return $ DeleteStmt targets
+
+docStringStmt :: Parser AST
+docStringStmt = do
+    tripleQuote <- string "\"\"\"" <|> string "'''"
+    content <- manyTill anyChar (try (string tripleQuote))
+    newline
+    return $ DocString content
+
+commentStmt :: Parser AST
+commentStmt = do
+    char '#'
+    content <- many (noneOf "\n")
+    optional newline
+    return $ Comment content
+
+------------------------------
+-- Expressions
+------------------------------
+
+-- Parses a full expression, using operator precedence and associativity rules.
+expr :: Parser Expr
+expr = primary
+
+-- Parses the most basic expressions, such as literals, if expressions, or parenthesized expressions.
+primary :: Parser Expr
+primary = choice
+    [ try ifExp
+    , try callExpr
+    , try attributeRef
+    , try subscriptExpr
+    , atom
+    ]
+
+-- Matches atomic expressions like literals, tuples, lists, dictionaries, and sets.
+atom :: Parser Expr
+atom = choice
+    [ intLiteral
+    , floatLiteral
+    , stringLiteral
+    , boolLiteral
+    , noneLiteral
+    , ellipsisLiteral
+    , tupleLiteral
+    , listLiteral
+    , dictLiteral
+    , setLiteral
+    , parens expr
+    ]
+
+-- Matches an integer literal.
+-- Example: "42"
+intLiteral :: Parser Expr
+intLiteral = IntLiteral <$> (read <$> many1 digit)
+
+-- Matches a floating-point literal.
+-- Example: "3.14"
+floatLiteral :: Parser Expr
+floatLiteral = do
+    whole <- many1 digit
+    char '.'
+    fractional <- many1 digit
+    return $ FloatLiteral (read (whole ++ "." ++ fractional))
+
+-- Matches a string literal enclosed in double quotes.
+-- Example: "\"Hello, world!\""
+stringLiteral :: Parser Expr
+stringLiteral = do
+    char '"'
+    content <- many (noneOf "\"")
+    char '"'
+    return $ StringLiteral content
+
+-- Matches a boolean literal ("True" or "False").
+-- Examples: "True", "False"
+boolLiteral :: Parser Expr
+boolLiteral = (BoolLiteral True <$ string "True") <|> (BoolLiteral False <$ string "False")
+
+-- Matches the Python "None" literal.
+-- Example: "None"
+noneLiteral :: Parser Expr
+noneLiteral = NoneLiteral <$ string "None"
+
+-- Matches the Python ellipsis literal ("...").
+-- Example: "..."
+ellipsisLiteral :: Parser Expr
+ellipsisLiteral = EllipsisLiteral <$ string "..."
+
+-- Matches an inline if expression.
+-- Examples:
+-- "x if y > 0 else z"
+ifExp :: Parser Expr
+ifExp = do
+    condition <- expr
+    spaces
+    string "if"
+    spaces
+    trueExpr <- expr
+    spaces
+    string "else"
+    spaces
+    falseExpr <- expr
+    return $ IfExp condition trueExpr falseExpr
+
+-- Matches a dictionary literal.
+-- Example: "{'key': 'value', 'other': 42}"
+dictLiteral :: Parser Expr
+dictLiteral = do
+    char '{'
+    pairs <- sepBy keyValuePair (char ',' >> spaces)
+    char '}'
+    return $ DictLiteral pairs
+  where
+    keyValuePair = do
+        key <- expr
+        spaces
+        char ':'
+        spaces
+        value <- expr
+        return (key, value)
+
+-- Matches a set literal.
+-- Example: "{1, 2, 3}"
+setLiteral :: Parser Expr
+setLiteral = do
+    char '{'
+    elements <- sepBy expr (char ',' >> spaces)
+    char '}'
+    return $ SetLiteral elements
+
+-- Matches a list literal.
+-- Example: "[1, 2, 3]"
+listLiteral :: Parser Expr
+listLiteral = do
+    char '['
+    elements <- sepBy expr (char ',' >> spaces)
+    char ']'
+    return $ ListLiteral elements
+
+-- Matches a tuple literal.
+-- Example: "(1, 2, 3)"
+tupleLiteral :: Parser Expr
+tupleLiteral = do
+    char '('
+    elements <- sepBy expr (char ',' >> spaces)
+    char ')'
+    return $ TupleLiteral elements
+
+-- Matches a function call.
+-- Example: "func(1, 2, 3)"
+callExpr :: Parser Expr
+callExpr = do
+    func <- primary
+    char '('
+    args <- sepBy expr (char ',' >> spaces)
+    char ')'
+    return $ Call func (map Arg args)
+
+-- Matches attribute access.
+-- Example: "obj.attr"
+attributeRef :: Parser Expr
+attributeRef = do
+    obj <- primary
+    char '.'
+    attr <- identifier
+    return $ Attribute obj attr
+
+-- Matches subscripting or indexing.
+-- Example: "arr[0]"
+subscriptExpr :: Parser Expr
+subscriptExpr = do
+    obj <- primary
+    char '['
+    subscript <- expr
+    char ']'
+    return $ Subscript obj subscript
+
+-- Matches an "await" expression for asynchronous code.
+-- Example: "await some_async_func()"
+awaitExpr :: Parser Expr
+awaitExpr = Await <$> (string "await" >> spaces >> expr)
+
+-- Matches a "yield" or "yield from" expression.
+-- Examples:
+-- "yield x"
+-- "yield from iterable"
+yieldExpr :: Parser Expr
+yieldExpr = try (YieldFrom <$> (string "yield from" >> spaces >> expr))
+         <|> (Yield <$> optionMaybe (string "yield" >> spaces >> expr))
+
+-- Matches a formatted string (f-string).
+-- Example: "f\"Hello, {name}!\""
+fString :: Parser Expr
+fString = do
+    char 'f'
+    char '"'
+    content <- many (formattedValue <|> rawText)
+    char '"'
+    return $ JoinedString content
+  where
+    formattedValue = do
+        char '{'
+        value <- expr
+        char '}'
+        return $ FormattedValue value Nothing Nothing
+    rawText = StringLiteral <$> many1 (noneOf "{}")
+
+------------------------------
+-- Operators
+------------------------------
+
+-- | Parser for binary operators.
+-- This parser tries the longest matches first (like "**") before shorter ones.
+parseBinOp :: Parser BinOp
+parseBinOp = choice
+    [ try (string "**")   >> return Pow
+    , try (string "//")   >> return FloorDiv
+    , try (string "<<")   >> return LShift
+    , try (string ">>")   >> return RShift
+    , string "+"          >> return Add
+    , string "-"          >> return Sub
+    , string "*"          >> return Mult
+    , string "@"          >> return MatMult
+    , string "/"          >> return Div
+    , string "%"          >> return Mod
+    , string "|"          >> return BitOr
+    , string "^"          >> return BitXor
+    , string "&"          >> return BitAnd
+    , try (string "==")   >> return EqOp
+    , try (string "!=")   >> return NotEq
+    , try (string "<=")   >> return LtE
+    , try (string ">=")   >> return GtE
+    , string "<"          >> return Lt
+    , string ">"          >> return Gt
+    , try (string "is not") >> return IsNot
+    , string "is"         >> return Is
+    , try (string "not in") >> return NotIn
+    , string "in"         >> return In
+    ]
+
+-- | Parser for unary operators.
+parseUnaryOp :: Parser UnaryOp
+parseUnaryOp = choice
+    [ string "not" >> notFollowedBy alphaNum >> return UNot
+    , char '~' >> return UInvert
+    , char '+' >> return UAdd
+    , char '-' >> return USub
+    ]
+
+-- | Parser for augmented assignment operators.
+parseAugOp :: Parser AugOp
+parseAugOp = choice
+    [ try (string "+=")  >> return AugAdd
+    , try (string "-=")  >> return AugSub
+    , try (string "*=")  >> return AugMult
+    , try (string "@=")  >> return AugMatMult
+    , try (string "/=")  >> return AugDiv
+    , try (string "%=")  >> return AugMod
+    , try (string "//=") >> return AugFloorDiv
+    , try (string "**=") >> return AugPow
+    , try (string "<<=") >> return AugLShift
+    , try (string ">>=") >> return AugRShift
+    , try (string "|=")  >> return AugBitOr
+    , try (string "^=")  >> return AugBitXor
+    , try (string "&=")  >> return AugBitAnd
+    ]
+
+------------------------------
+-- Parameters and Arguments
+------------------------------
+
+-- | Parser for single parameter
+param :: Parser Param
+param = do
+    paramN  <- identifier
+    paramTH <- optionMaybe (try (spaces >> char ':' >> spaces >> expr))
+    paramD  <- optionMaybe (try (spaces >> char '=' >> spaces >> expr))
+    return $ Param paramN paramTH paramD
+
+-- | Parser for multiple parameters
+params :: Parser [Param]
+params = sepBy param (spaces >> char ',' >> spaces)
+
+------------------------------
+-- Imports
+------------------------------
+
+importItem :: Parser ImportItem
+importItem = do
+  moduleName <- identifier
+  alias <- optionMaybe (try (spaces >> string "as" >> spaces >> identifier))
+  return $ ImportItem moduleName alias
+
+------------------------------
+-- Indentation and Whitespace
+------------------------------
+
+indentation :: Parser Int
+indentation = do
+    spacesOrTabs <- many (oneOf " \t")
+    if all (== ' ') spacesOrTabs || all (== '\t') spacesOrTabs
+        then return (length spacesOrTabs)
+        else fail "Mixed spaces and tabs for indentation"
+
+-- | Parses a block of indented statements using the given statement parser.
+indentedBlock :: Parser AST -> Parser [AST]
+indentedBlock stmtParser = do
+    parentIndent <- currentIndentation  -- Get the current parent indentation level
+    many1 (indentedStmt parentIndent stmtParser) -- Parse statements with greater indentation
+
+-- | Parses a single statement with the expected indentation level.
+indentedStmt :: Int -> Parser AST -> Parser AST
+indentedStmt parentIndent stmtParser = do
+    actualIndent <- currentIndentation
+    if actualIndent > parentIndent
+        then stmtParser -- Parse the statement if indentation is valid
+        else fail "Unexpected indentation level"
+
+-- | Parses the current line's indentation and returns its level.
+currentIndentation :: Parser Int
+currentIndentation = do
+    spacesOrTabs <- many (oneOf " \t")  -- Consume leading spaces or tabs
+    let indentLevel = length spacesOrTabs
+    return indentLevel
+
+------------------------------
+-- Helpers
+------------------------------
+
+identifier :: Parser String
+identifier = do
+  first <- letter
+  rest <- many (alphaNum <|> char '_')
+  return (first:rest)
+
+parens :: Parser a -> Parser a
+parens p = do
+    char '('
+    spaces
+    x <- p
+    spaces
+    char ')'
+    return x

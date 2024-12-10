@@ -25,8 +25,10 @@ source-repository head
 
 library
   exposed-modules:
+      PythonAST
       PythonFormatter
       PythonLinter
+      PythonParser
   other-modules:
       Paths_CodeFormatter
   autogen-modules:
@@ -35,12 +37,14 @@ library
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
-      QuickCheck >=2.14
+      HUnit >=1.6
     , base >=4.7 && <5
     , containers
     , directory
     , filepath
     , mtl
+    , parsec
+    , text
   default-language: Haskell2010
 
 executable CodeFormatter-exe
@@ -54,18 +58,21 @@ executable CodeFormatter-exe
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       CodeFormatter
-    , QuickCheck >=2.14
+    , HUnit >=1.6
     , base >=4.7 && <5
     , containers
     , directory
     , filepath
     , mtl
+    , parsec
+    , text
   default-language: Haskell2010
 
 test-suite CodeFormatter-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      ASTTests
       Paths_CodeFormatter
   autogen-modules:
       Paths_CodeFormatter
@@ -74,10 +81,12 @@ test-suite CodeFormatter-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       CodeFormatter
-    , QuickCheck >=2.14
+    , HUnit >=1.6
     , base >=4.7 && <5
     , containers
     , directory
     , filepath
     , mtl
+    , parsec
+    , text
   default-language: Haskell2010

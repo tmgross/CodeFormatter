@@ -21,7 +21,9 @@ description:         Please see the README on GitHub at <https://github.com/tmgr
 
 dependencies:
 - base >= 4.7 && < 5
-- QuickCheck >= 2.14
+- HUnit >= 1.6
+- parsec
+- text
 - mtl
 - filepath
 - directory
