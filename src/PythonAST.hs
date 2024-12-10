@@ -116,7 +116,6 @@ data Expr
     | BinOp Expr BinOp Expr
     | UnaryOp UnaryOp Expr
     | Lambda [Param] Expr
-    | IfExp Expr Expr Expr              -- x if cond else y
     | DictLiteral [(Expr, Expr)]
     | SetLiteral [Expr]
     | ListLiteral [Expr]

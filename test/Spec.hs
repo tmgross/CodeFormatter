@@ -4,6 +4,6 @@ import ASTTests (astTests)
 
 main :: IO ()
 main = do
-    putStrLn "Running AST Tests..."
+    putStrLn "\nRunning AST Tests..."
     _ <- runTestTT astTests
     return ()
