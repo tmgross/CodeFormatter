@@ -1,6 +1,6 @@
 module Main where
 
-import System.FilePath (takeExtension, dropExtension)
+import System.FilePath (takeExtension, dropExtension, (</>))
 import System.IO (readFile, writeFile)
 import System.Environment (getArgs)
 import PythonFormatter
@@ -27,12 +27,16 @@ processFile filePath = do
             let lintResult = PythonLinter.lint contents
             
             -- Write the formatted content to a new file
-            writeFile (dropExtension filePath ++ "_formatted" ++ fileExt) formatted
-            putStrLn "File formatted successfully!"
+            let formattedFilePath = dropExtension filePath ++ "_formatted" ++ fileExt
+            writeFile formattedFilePath formatted
+            putStrLn $ "File formatted successfully! Written to: " ++ formattedFilePath
             
-            -- Extract warnings and print them
+            -- Extract warnings and write them to a new file
             let lintWarnings = warnings lintResult
-            mapM_ (putStrLn . formatWarning) lintWarnings  -- Print each warning
+            let lintFilePath = dropExtension filePath ++ "_lint.txt"
+            let formattedWarnings = unlines $ map formatWarning lintWarnings
+            writeFile lintFilePath formattedWarnings
+            putStrLn $ "Lint warnings written to: " ++ lintFilePath
         _ -> putStrLn $ "Unsupported file type: " ++ fileExt
 
 -- | Format a LintWarning for printing
