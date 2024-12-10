@@ -89,7 +89,7 @@ formatLines (line:rest) = do
     let _state = updateState _line state
     put _state
     _rest <- formatLines rest
-    trace (show (indentLevel _state) ++ "-" ++ "-" ++ show (calculateIndentLevel _line 4) ++ ": " ++ _line)  return (_line:_rest)
+    return (_line:_rest)
 
 updateState :: String -> FormatState -> FormatState
 updateState line state =
@@ -105,7 +105,6 @@ updateState line state =
             | otherwise = currentBlockStack
 
         isClass = "class" `isInfixOf` line
-        isDef = "def" `isInfixOf` line
 
         indent
             | isClass = 1
