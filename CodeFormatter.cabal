@@ -73,6 +73,7 @@ test-suite CodeFormatter-test
   main-is: Spec.hs
   other-modules:
       ASTTests
+      FormatTests
       Paths_CodeFormatter
   autogen-modules:
       Paths_CodeFormatter
