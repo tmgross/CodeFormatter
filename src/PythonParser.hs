@@ -749,7 +749,7 @@ parens p = do
     return x
 
 lineEnd :: Parser ()
-lineEnd = void (char '\n') <|> eof -- Match either a newline or end-of-file
+lineEnd = void (newline) <|> eof
 
 whitespace :: Parser ()
 whitespace = void $ many (char ' ' <|> char '\t') -- Match whitespace/tabs
