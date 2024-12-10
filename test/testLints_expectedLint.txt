@@ -1,0 +1,2 @@
+Line 1 [UnusedImport]: Unused import: pandas
+Line 4 [NamingConventionViolation]: Function name 'calculateSum' violates naming convention: use snake_case (lowercase with underscores).

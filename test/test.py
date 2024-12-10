@@ -1,6 +1,3 @@
-import pandas
-import random
-
 def example_function(x,y):
   if x>y:
   print("x is greater than y")
@@ -15,7 +12,6 @@ def example_function(x,y):
 class ExampleClass:
   def __init__(self, name):
     self.name=name
-    self.id=(random.random)
     print("ExampleClass created")
 
   def greet(self):

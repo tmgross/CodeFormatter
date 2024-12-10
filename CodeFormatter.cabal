@@ -74,6 +74,7 @@ test-suite CodeFormatter-test
   other-modules:
       ASTTests
       FormatTests
+      LintTests
       Paths_CodeFormatter
   autogen-modules:
       Paths_CodeFormatter
