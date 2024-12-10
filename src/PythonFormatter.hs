@@ -129,30 +129,6 @@ process (c1:c2:rest)
 calculateIndentLevel :: String -> Int -> Int
 calculateIndentLevel line width = length (takeWhile isSpace line) `div` width
 
--- | Format a Python dictionary literal.
-formatDict :: String -> Int -> State FormatState String
-formatDict = undefined
-
--- | Format a Python list literal.
-formatList :: String -> Int -> State FormatState String
-formatList listString indentLevel = undefined
-
--- | Format a Python function definition, including indentation and spacing.
-formatFunction :: String -> Int -> State FormatState String
-formatFunction funcString indentLevel = undefined
-
--- | Format Python if-else structures.
-formatIfElse :: String -> Int -> State FormatState String
-formatIfElse ifElseString indentLevel = undefined
-
--- | Format Python class definitions.
-formatClass :: String -> Int -> State FormatState String
-formatClass classString indentLevel = undefined
-
--- | Split long lines into smaller chunks while respecting Python syntax.
-splitLongLines :: String -> Int -> State FormatState [String]
-splitLongLines longLine indentLevel = undefined
-
 -- | Helper to determine if a line starts a new block (e.g., ends with a colon)
 isBlockStart :: String -> Bool
 isBlockStart line = not (null line) && last line == ':'
