@@ -48,7 +48,7 @@ runLintChecks :: String -> State LintState ()
 runLintChecks code = do
     addWarnings $ checkUnusedImports code
     -- addWarnings $ checkSyntaxErrors code
-    -- addWarnings $ validateNamingConventions code
+    addWarnings $ validateNamingConventions code
     -- addWarnings $ checkUnusedVariables code
     -- addWarnings $ checkDeprecatedFunctions code
     -- addWarnings $ checkMutableDefaults code
@@ -146,7 +146,37 @@ checkSyntaxErrors = undefined
 
 -- | Validates the naming conventions in the Python code.
 validateNamingConventions :: String -> [LintWarning]
-validateNamingConventions = undefined
+validateNamingConventions code =
+    let linesOfCode = zip [1..] (lines code)
+        -- Find all function definitions
+        functions = mapMaybe extractFunctionName linesOfCode
+        -- Check for function names with uppercase letters
+        invalidFunctions = filter hasUpperCase functions
+    in map generateNamingWarning invalidFunctions
+  where
+    -- Extracts function name and its line number from a "def <name>" line
+    extractFunctionName :: (Int, String) -> Maybe (Int, String)
+    extractFunctionName (lineNum, line) =
+        let trimmed = dropWhile isSpace line
+        in if "def " `isPrefixOf` trimmed
+              then case words (drop (length "def ") trimmed) of
+                      (name : _) -> Just (lineNum, takeWhile (/= '(') name)
+                      _ -> Nothing
+              else Nothing
+
+    -- Checks if a string contains uppercase letters
+    hasUpperCase :: (Int, String) -> Bool
+    hasUpperCase (_, name) = any (`elem` ['A'..'Z']) name
+
+    -- Generates a warning for naming convention violations, including the function name
+    generateNamingWarning :: (Int, String) -> LintWarning
+    generateNamingWarning (lineNum, name) =
+        LintWarning
+            { warningType = NamingConventionViolation
+            , lineNumber = lineNum
+            , message = "Function name '" ++ name ++ "' violates naming convention: use snake_case (lowercase with underscores)."
+            }
+
 
 -- | Checks for unused variable declarations.
 checkUnusedVariables :: String -> [LintWarning]
