@@ -1,6 +1,6 @@
 # CodeFormatter
 
-Our project aims to format and lint Python files in Haskell. It is split between 4 modules: PythonAST, Parser, Formatter, and Linter, each with a corresponding tester. Supporting new syntax simply requires extending the AST, implementing it to the parser, adding any edge cases to the formatter and specify any common errors for the linter. Then add tests to each of the testing suites.
+Our project aims to format and lint Python files in Haskell. It is split between 4 modules: PythonAST, PythonParser, PythonFormatter, and PythonLinter, each with a corresponding tester. Supporting new syntax simply requires extending the AST, implementing it to the parser, adding any edge cases to the formatter and specify any common errors for the linter. Then add tests to each of the testing suites.
 
 src/formatter.config hosts parameters for user defined specifications to the outputted file - there's currently a bug so I hardcode 4 as the tabWidth in some cases.
 src/PythonAST.hs is a representation of a Python AST as it's own data type and expressions possible in Python
@@ -16,7 +16,15 @@ should give every required module and
 
 > stack run {source of python file}
 
-should return a cleaned file. 
+Will create a `{file}\_formatted.py` and `{file}\_lint.txt` with the resulting formatted file and lint result respectively. 
+
+> stack clean
+
+will delete build artefacts. 
+
+> stack test
+
+will run the test cases in `ASTTests.hs`, `FormatTests.hs`, and `LintTests.hs`.
 
 Submission Notes
 Jack Sherick

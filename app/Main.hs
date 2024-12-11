@@ -42,4 +42,4 @@ processFile filePath = do
 -- | Format a LintWarning for printing
 formatWarning :: PythonLinter.LintWarning -> String
 formatWarning (PythonLinter.LintWarning _ lineNumber message) =
-    "Line " ++ show lineNumber ++ ": " ++ message
+    message
