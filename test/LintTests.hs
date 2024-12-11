@@ -46,7 +46,6 @@ test_linter = TestCase $ do
 
     -- Clean up the output file after the test
     removeFile outputLintFile
-    removeFile "test/testLints_formatted.py"
 
 lintTests :: Test
 lintTests = TestList [TestLabel "test_linter" test_linter]

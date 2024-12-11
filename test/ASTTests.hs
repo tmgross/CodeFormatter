@@ -9,7 +9,7 @@ import PythonAST
 
 -- Helper function to parse a string and assert the result
 assertParse :: (Eq a, Show a) => Parser a -> String -> a -> Test
-assertParse parser input expected = TestCase $ 
+assertParse parser input expected = TestCase $
     case parse parser "" input of
         Left err -> assertFailure (show err)
         Right result -> assertEqual ("Parsing: " ++ input) expected result
@@ -40,7 +40,7 @@ testExpressions = TestList
     , TestLabel "Expr | Unary Not" $ assertParse expr "not x" (UnaryOp UNot (Identifier "x"))
     , TestLabel "Expr | BinOp Addition" $ assertParse expr "x + y" (BinOp (Identifier "x") Add (Identifier "y"))
     , TestLabel "Expr | List Literal" $ assertParse expr "[1, 2, 3]" (ListLiteral [IntLiteral 1, IntLiteral 2, IntLiteral 3])
-    , TestLabel "Expr | Dict Literal" $ assertParse expr "{\"key\": \"value\"}" 
+    , TestLabel "Expr | Dict Literal" $ assertParse expr "{\"key\": \"value\"}"
         (DictLiteral [(StringLiteral "key", StringLiteral "value")])
     ]
 
@@ -50,19 +50,19 @@ testImports = TestList
     [ TestLabel "Parser | Import | Single Module" $
         assertParse stmt "import os\n" (ImportStmt [ImportItem "os" Nothing])
     , TestLabel "Parser | Import | Multiple Modules" $
-        assertParse stmt "import os, sys\n" 
+        assertParse stmt "import os, sys\n"
             (ImportStmt [ImportItem "os" Nothing, ImportItem "sys" Nothing])
     , TestLabel "Parser | Import | With Alias" $
-        assertParse stmt "import numpy as np\n" 
+        assertParse stmt "import numpy as np\n"
             (ImportStmt [ImportItem "numpy" (Just "np")])
     , TestLabel "Parser | From Import | Single Item" $
-        assertParse stmt "from math import sqrt\n" 
+        assertParse stmt "from math import sqrt\n"
             (FromImportStmt "math" [ImportItem "sqrt" Nothing])
     , TestLabel "Parser | From Import | Multiple Items" $
-        assertParse stmt "from math import sqrt, pi\n" 
+        assertParse stmt "from math import sqrt, pi\n"
             (FromImportStmt "math" [ImportItem "sqrt" Nothing, ImportItem "pi" Nothing])
     , TestLabel "Parser | From Import | With Alias" $
-        assertParse stmt "from math import sqrt as root\n" 
+        assertParse stmt "from math import sqrt as root\n"
             (FromImportStmt "math" [ImportItem "sqrt" (Just "root")])
     ]
 
